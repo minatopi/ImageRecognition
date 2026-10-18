@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>TensorFlow.js 物体検出デモ（画像選択＆日本語対応）</title>
+    <!-- ① TensorFlow.js 本体と、物体検出モデル(COCO-SSD)を読み込む（最新のCDNに変更） -->
+    <script src="https://jsdelivr.net"></script>
+    <script src="https://jsdelivr.net"></script>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        #img-container { margin: 20px 0; }
+        #img { max-width: 400px; display: none; }
+    </style>
+</head>
+<body>
+
+    <h1>TensorFlow.js 物体検出（日本語版）</h1>
+    
+    <!-- 画像ファイルを選択するインプットを追加 -->
+    <input type="file" id="image-selector" accept="image/*" disabled>
+    <span id="load-status">モデルを読み込み中...</span>
+
+    <div id="img-container">
+        <img id="img" crossorigin="anonymous" />
+    </div>
+    
+    <div id="result"></div>
+
+    <script>
+        // COCO-SSDの英語クラス名から日本語への変換マッピング辞書
+        const cocoRxTranslations = {
+            "person": "人", "bicycle": "自転車", "car": "車", "motorcycle": "バイク", "airplane": "飛行機",
+            "bus": "バス", "train": "電車", "truck": "トラック", "boat": "船", "traffic light": "信号機",
+            "fire hydrant": "消火栓", "stop sign": "一時停止標識", "parking meter": "パーキングメーター", "bench": "ベンチ", "bird": "鳥",
+            "cat": "猫", "dog": "犬", "horse": "馬", "sheep": "羊", "cow": "牛",
+            "elephant": "ゾウ", "bear": "クマ", "zebra": "シマウマ", "giraffe": "キリン", "backpack": "バックパック",
+            "umbrella": "傘", "handbag": "ハンドバッグ", "tie": "ネクタイ", "suitcase": "スーツケース", "frisbee": "フリスビー",
+            "skis": "スキー板", "snowboard": "スノーボード", "sports ball": "スポーツボール", "kite": "カイト", "baseball bat": "野球バット",
+            "baseball glove": "野球グローブ", "skateboard": "スケートボード", "surfboard": "サーフボード", "tennis racket": "テニスラケット", "bottle": "ボトル",
+            "wine glass": "ワイングラス", "cup": "カップ", "fork": "フォーク", "knife": "ナイフ", "spoon": "スプーン",
+            "bowl": "ボウル", "banana": "バナナ", "apple": "リンゴ", "sandwich": "サンドイッチ", "orange": "オレンジ",
+            "broccoli": "ブロッコリー", "carrot": "ニンジン", "hot dog": "ホットドッグ", "pizza": "ピザ", "donut": "ドーナツ",
+            "cake": "ケーキ", "chair": "椅子", "couch": "ソファ", "potted plant": "観葉植物", "bed": "ベッド",
+            "dining table": "ダイニングテーブル", "toilet": "トイレ", "tv": "テレビ", "laptop": "ノートパソコン", "mouse": "マウス",
+            "remote": "リモコン", "keyboard": "キーボード", "cell phone": "携帯電話", "microwave": "電子レンジ", "oven": "オーブン",
+            "toaster": "トースター", "sink": "シンク", "refrigerator": "冷蔵庫", "book": "本", "clock": "時計",
+            "vase": "花瓶", "scissors": "ハサミ", "teddy bear": "テディベア", "hair drier": "ヘアドライヤー", "toothbrush": "歯ブラシ"
+        };
+
+        let model;
+        const imageSelector = document.getElementById('image-selector');
+        const loadStatus = document.getElementById('load-status');
+        const img = document.getElementById('img');
+        const resultDiv = document.getElementById('result');
+
+        // ページの読み込み時にモデルを初期化
+        async function init() {
+            model = await cocoSsd.load();
+            loadStatus.innerText = "モデルの読み込みが完了しました。画像を選択してください。";
+            imageSelector.disabled = false; // 画像選択を有効化
+        }
+
+        // 画像が選択された時の処理
+        imageSelector.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                img.src = event.target.result;
+                img.style.display = 'block'; // 画像を表示
+                resultDiv.innerHTML = "認識中...";
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // 画像の読み込みが完了したら自動で物体検出を実行
+        img.onload = async function() {
+            if (!model) return;
+
+            // 物体検出（推論）の実行
+            const predictions = await model.detect(img);
+
+            // 結果の表示
+            if (predictions.length === 0) {
+                resultDiv.innerHTML = "<h3>認識結果:</h3><p>何も検出されませんでした。</p>";
+                return;
+            }
+
+            resultDiv.innerHTML = "<h3>認識結果:</h3>";
+            predictions.forEach(p => {
+                // 英語のクラス名を日本語に変換（見つからない場合は英語のまま表示）
+                const japaneseClass = cocoRxTranslations[p.class] || p.class;
+                resultDiv.innerHTML += `<p>🚀 <b>${japaneseClass}</b> - 確率: ${(p.score * 100).toFixed(1)}%</p>`;
+            });
+        };
+
+        window.onload = init;
+    </script>
+</body>
+</html>
