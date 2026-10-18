@@ -2,22 +2,30 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>TensorFlow.js 画像認識（超軽量・爆速読み込み版）</title>
-    <!-- ① TensorFlow.js 本体と、超軽量モデル(MobileNet)を読み込む（容量合計わずか数MB） -->
-    <script src="https://jsdelivr.net"></script>
-    <script src="https://jsdelivr.net"></script>
+    <title>TensorFlow.js 物体検出デモ（URL修正版）</title>
+    <!-- ① 一番シンプルで書き換えられにくい形式でライブラリを読み込む -->
+    <script src="https://jsdelivr.net" crossorigin="anonymous"></script>
+    <script src="https://jsdelivr.net" crossorigin="anonymous"></script>
+    
+    <!-- 
+      ※もし上の2行でもURLが削られてエラーになる場合は、以下の「cdnjs」版のコメントアウト（<!-- と -->）を外して、上の2行を消してみてください。
+      <script src="https://cloudflare.com" crossorigin="anonymous"></script>
+      <script src="https://cloudflare.com" crossorigin="anonymous"></script>
+    -->
+
     <style>
-        body { font-family: sans-serif; margin: 20px; }
+        body { font-family: sans-serif; margin: 20px; background: #f5f5f5; }
         #img-container { margin: 20px 0; }
-        #preview-canvas { max-width: 400px; border: 1px solid #ccc; display: none; }
+        #preview-canvas { max-width: 400px; border: 2px solid #ccc; display: none; }
+        .status-text { font-weight: bold; color: #555; }
     </style>
 </head>
 <body>
 
-    <h1>TensorFlow.js 画像認識（超軽量・爆速版）</h1>
+    <h1>TensorFlow.js 物体検出（URL修正版）</h1>
     
     <input type="file" id="image-selector" accept="image/*" disabled>
-    <span id="load-status">モデルを読み込み中...</span>
+    <span id="load-status" class="status-text">モデルを読み込み中...</span>
 
     <div id="img-container">
         <canvas id="preview-canvas"></canvas>
@@ -26,26 +34,19 @@
     <div id="result"></div>
 
     <script>
-        // 主要なMobileNetクラス名の日本語マッピング（一部抜粋。ヒットしない場合は英語で表示）
         const translations = {
-            "tabby, tabby cat": "トラ猫", "Egyptian cat": "エジプト猫", "Persian cat": "ペルシャ猫",
-            "golden retriever": "ゴールデンレトリバー", "German shepherd, German shepherd dog, German police dog, alsatian": "ジャーマンシェパード",
-            "Labrador retriever": "ラブラドールレトリバー", "Chihuahua": "チワワ", "Pomeranian": "ポメラニアン",
-            "sports car, sport car": "スポーツカー", "convertible": "オープンカー", "minivan": "ミニバン", "pickup, pickup truck": "ピックアップトラック",
-            "beach wagon, station wagon, wagon, estate car, beach waggon, station waggon, waggon": "ステーションワゴン",
-            "passenger car, coach, carriage": "客車/乗用車", "racer, race car, racing car": "レーシングカー",
-            "mountain bike, mountain bicycle": "マウンテンバイク", "folding bicycle": "折りたたみ自転車",
-            " airliner": "旅客機", "warplane, military plane": "軍用機", "space shuttle": "スペースシャトル",
-            "banana": "バナナ", "granny smith": "青リンゴ", "orange": "オレンジ", "lemon": "レモン", "pineapple, ananas": "パイナップル",
-            "strawberry": "イチゴ", "cheeseburger": "チーズバーガー", "hotdog, hot dog, red hot": "ホットドッグ", "pizza, pizza pie": "ピザ",
-            "espresso": "エスプレッソ", "red wine": "赤ワイン", "coffee mug": "コーヒーカップ",
-            "laptop, laptop computer": "ノートパソコン", "desktop computer": "デスクトップPC", "monitor": "モニター",
-            "cellular telephone, cellular phone, cellphone, cell, mobile phone": "携帯電話/スマホ",
-            "television, television system": "テレビ", "mouse, computer mouse": "マウス", "keyboard, computer keyboard": "キーボード",
-            "acoustic guitar": "アコースティックギター", "electric guitar": "エレキギター", "grand piano, grand": "グランドピアノ",
-            "desk": "机", "rocking chair, rocker": "ロッキングチェア", "barber chair": "理髪店の椅子", "folding chair": "折りたたみ椅子",
-            "velvet": "ベルベット/ソファ", "studio couch, daybed": "ソファベッド",
-            "ballpoint, ballpoint pen, ballpen": "ボールペン", "fountain pen": "万年筆", "notebook, notebook computer": "ノート/手帳"
+            "person": "人", "bicycle": "自転車", "car": "車", "motorcycle": "バイク", "airplane": "飛行機",
+            "bus": "バス", "train": "電車", "truck": "トラック", "boat": "船", "traffic light": "信号機",
+            "bird": "鳥", "cat": "猫", "dog": "犬", "horse": "馬", "sheep": "羊", "cow": "牛",
+            "elephant": "ゾウ", "bear": "クマ", "zebra": "シマウマ", "giraffe": "キリン", "backpack": "バックパック",
+            "umbrella": "傘", "handbag": "ハンドバッグ", "tie": "ネクタイ", "suitcase": "スーツケース",
+            "bottle": "ボトル", "wine glass": "ワイングラス", "cup": "カップ", "fork": "フォーク", "knife": "ナイフ",
+            "spoon": "スプーン", "bowl": "ボウル", "banana": "バナナ", "apple": "リンゴ", "sandwich": "サンドイッチ",
+            "orange": "オレンジ", "broccoli": "ブロッコリー", "carrot": "ニンジン", "hot dog": "ホットドッグ", "pizza": "ピザ",
+            "donut": "ドーナツ", "cake": "ケーキ", "chair": "椅子", "couch": "ソファ", "potted plant": "観葉植物",
+            "bed": "ベッド", "dining table": "ダイニングテーブル", "toilet": "トイレ", "tv": "テレビ", "laptop": "ノートパソコン",
+            "mouse": "マウス", "remote": "リモコン", "keyboard": "キーボード", "cell phone": "携帯電話", "book": "本",
+            "clock": "時計", "vase": "花瓶", "scissors": "ハサミ", "teddy bear": "テディベア", "toothbrush": "歯ブラシ"
         };
 
         let model;
@@ -56,21 +57,40 @@
         const resultDiv = document.getElementById('result');
 
         async function init() {
-            // ★ 高速化：超軽量モデルのロード（COCO-SSDより圧倒的に早い）
-            model = await mobilenet.load();
-            loadStatus.innerText = "準備完了！画像を選択してください。";
-            imageSelector.disabled = false;
+            console.log("[Init] 初期化プロセスを開始します。");
+            try {
+                // スクリプトの存在チェック
+                console.log("[Init] tf の状態:", typeof tf !== 'undefined' ? "OK" : "未定義");
+                console.log("[Init] cocoSsd の状態:", typeof cocoSsd !== 'undefined' ? "OK" : "未定義");
+
+                if (typeof tf === 'undefined' || typeof cocoSsd === 'undefined') {
+                    throw new Error("ライブラリが正しく読み込まれていません。ブラウザがURLを拒否した可能性があります。");
+                }
+
+                console.log("[Model] cocoSsd.load() を実行します...");
+                model = await cocoSsd.load();
+                console.log("[Model] ロード成功！");
+
+                loadStatus.style.color = "green";
+                loadStatus.innerText = "準備完了！画像を選択してください。";
+                imageSelector.disabled = false;
+
+            } catch (error) {
+                console.error("[Fatal Error] 原因:", error.message);
+                loadStatus.style.color = "red";
+                loadStatus.innerText = "初期化に失敗しました。コンソールを確認してください。";
+            }
         }
 
         imageSelector.addEventListener('change', (e) => {
             const file = e.target.files;
             if (!file) return;
+            console.log(`[File] 選択されたファイル: ${file.name}`);
 
             const reader = new FileReader();
             reader.onload = (event) => {
                 const img = new Image();
                 img.onload = async () => {
-                    // 画像のリサイズ処理
                     const maxW = 400;
                     const scale = maxW / img.width;
                     canvas.width = maxW;
@@ -78,18 +98,22 @@
                     
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                     canvas.style.display = 'block';
-                    resultDiv.innerHTML = "認識中...";
+                    resultDiv.innerHTML = "AI識別中...";
 
-                    // 軽量モデルで高速予測
-                    const predictions = await model.classify(canvas);
+                    console.log("[AI] 推論（判定）を開始します...");
+                    const predictions = await model.detect(canvas);
+                    console.log("[AI] 判定完了。データ数:", predictions.length);
 
-                    // 結果表示
-                    resultDiv.innerHTML = "<h3>認識結果（確率の高い順）:</h3>";
-                    predictions.forEach(p => {
-                        // 辞書にあれば日本語、なければ英語のまま（最初の候補を取得）
-                        const engClassName = p.className.split(',')[0];
-                        const japaneseClass = translations[p.className] || translations[engClassName] || p.className;
-                        resultDiv.innerHTML += `<p>🚀 <b>${japaneseClass}</b> - 確率: ${(p.probability * 100).toFixed(1)}%</p>`;
+                    if (predictions.length === 0) {
+                        resultDiv.innerHTML = "<h3>認識結果:</h3><p>何も検出されませんでした。</p>";
+                        return;
+                    }
+
+                    resultDiv.innerHTML = "<h3>認識結果:</h3>";
+                    predictions.forEach((p, i) => {
+                        const japaneseClass = translations[p.class] || p.class;
+                        console.log(`[Result #${i+1}] ${p.class} -> ${japaneseClass} (${(p.score * 100).toFixed(1)}%)`);
+                        resultDiv.innerHTML += `<p>🚀 <b>${japaneseClass}</b> - 確率: ${(p.score * 100).toFixed(1)}%</p>`;
                     });
                 };
                 img.src = event.target.result;
